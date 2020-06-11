@@ -1,6 +1,5 @@
 import os
 import sys
-import h5py
 import argparse
 import importlib
 import numpy as np
@@ -11,12 +10,12 @@ sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(BASE_DIR, 'models'))
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 import provider
-import tf_util
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--gpu', type=int, default=0, help='GPU to use [default: GPU 0]')
 parser.add_argument('--model', default='RIConv', help='Model name: RIConv')
 parser.add_argument('--log_dir', default='log/classification', help='Log dir [default: log]')
+parser.add_argument('--data_dir', default='../data/modelnet40_ply_hdf5_2048', help='Data dir [../data/modelnet40_ply_hdf5_2048]')
 parser.add_argument('--num_point', type=int, default=1024, help='Point Number [256/512/1024/2048] [default: 1024]')
 parser.add_argument('--max_epoch', type=int, default=250, help='Epoch to run [default: 250]')
 parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training [default: 32]')
@@ -41,6 +40,7 @@ DECAY_RATE = FLAGS.decay_rate
 MODEL = importlib.import_module(FLAGS.model) # import network module
 MODEL_FILE = os.path.join(BASE_DIR, 'models', FLAGS.model+'.py')
 LOG_DIR = FLAGS.log_dir
+DATA_DIR = FLAGS.data_dir
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 LOG_FOUT.write(str(FLAGS)+'\n')
@@ -54,10 +54,8 @@ BN_DECAY_DECAY_STEP = float(DECAY_STEP)
 BN_DECAY_CLIP = 0.99
 
 # ModelNet40 official train/test split
-TRAIN_FILES = provider.getDataFiles( \
-    os.path.join(BASE_DIR, '../data/modelnet40_ply_hdf5_2048/train_files.txt'))
-TEST_FILES = provider.getDataFiles(\
-    os.path.join(BASE_DIR, '../data/modelnet40_ply_hdf5_2048/test_files.txt'))
+TRAIN_FILES = provider.getDataFiles(os.path.join(DATA_DIR, 'train_files.txt'))
+TEST_FILES = provider.getDataFiles(os.path.join(DATA_DIR, 'test_files.txt'))
 
 conv_param_name = ('K', 'D', 'P', 'C', 'links')
 conv_params = [dict(zip(conv_param_name, conv_param)) for conv_param in
@@ -74,11 +72,11 @@ fc_params = [dict(zip(fc_param_name, fc_param)) for fc_param in
 WITH_LOCAL = True
 WITH_MULTI = True
 
+
 def log_string(out_str):
     LOG_FOUT.write(out_str+'\n')
     LOG_FOUT.flush()
     print(out_str)
-
 
 def get_learning_rate(batch):
     learning_rate = tf.train.exponential_decay(
@@ -101,8 +99,10 @@ def get_bn_decay(batch):
     return bn_decay
 
 def train():
-    shape_names = [line.rstrip() for line in \
-        open('../data/modelnet40_ply_hdf5_2048/shape_names.txt')] 
+    shape_names = [
+        line.rstrip() for line in
+        open(os.path.join(DATA_DIR, 'shape_names.txt'))
+    ]
 
     with tf.Graph().as_default():
         with tf.device('/gpu:'+str(GPU_INDEX)):
@@ -161,15 +161,17 @@ def train():
         init = tf.global_variables_initializer()
         sess.run(init)
 
-        ops = {'pointclouds_pl': pointclouds_pl,
-               'labels_pl': labels_pl,
-               'is_training_pl': is_training_pl,
-               'pred': pred,
-               'loss': loss,
-               'prediction_op': predictions_op,
-               'train_op': train_op,
-               'merged': merged,
-               'step': batch}
+        ops = {
+            'pointclouds_pl': pointclouds_pl,
+            'labels_pl': labels_pl,
+            'is_training_pl': is_training_pl,
+            'pred': pred,
+            'loss': loss,
+            'prediction_op': predictions_op,
+            'train_op': train_op,
+            'merged': merged,
+            'step': batch,
+        }
 
         parameter_num = np.sum([np.prod(v.shape.as_list()) for v in tf.trainable_variables()])
         print('Parameter number: {:d}.'.format(int(parameter_num)))
@@ -215,7 +217,7 @@ def train_one_epoch(sess, ops, train_writer):
     
     for fn in range(len(TRAIN_FILES)):
         log_string('----' + str(fn) + '-----')
-        current_data, current_label = provider.loadDataFile(os.path.join('../data/modelnet40_ply_hdf5_2048/',TRAIN_FILES[train_file_idxs[fn]]))
+        current_data, current_label = provider.loadDataFile(os.path.join(DATA_DIR, TRAIN_FILES[train_file_idxs[fn]]))
         current_data = current_data[:,0:NUM_POINT,:]
         current_data, current_label= provider.shuffle_data(current_data, np.squeeze(current_label))            
         current_label = np.squeeze(current_label)
@@ -262,7 +264,7 @@ def eval_one_epoch(sess, ops, test_writer):
     eval_start_time = time()  # eval start time
     BATCH_SIZE_val = 4
     for fn in range(len(TEST_FILES)):
-        current_data, current_label = provider.loadDataFile(os.path.join('../data/modelnet40_ply_hdf5_2048/',TEST_FILES[fn]))
+        current_data, current_label = provider.loadDataFile(os.path.join(DATA_DIR, TEST_FILES[fn]))
         current_data = current_data[:,0:NUM_POINT,:]
         current_label = np.squeeze(current_label)
         
