@@ -170,9 +170,11 @@ def getDataFiles(list_filename):
     return [line.rstrip() for line in open(list_filename)]
 
 def load_h5(h5_filename):
-    f = h5py.File(h5_filename)
+    f = h5py.File(h5_filename, 'r')
     data = f['data'][:]
+    data = np.array(data, dtype='float32')
     label = f['label'][:]
+    label = label.reshape(-1, 1)
     return (data, label)
 
 def loadDataFile(filename):

@@ -45,8 +45,13 @@ if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 LOG_FOUT.write(str(FLAGS)+'\n')
 
+shape_names = [
+    line.rstrip() for line in
+    open(os.path.join(DATA_DIR, 'shape_names.txt'))
+]
+
 MAX_NUM_POINT = 2048
-NUM_CLASSES = 40
+NUM_CLASSES = len(shape_names)
 
 BN_INIT_DECAY = 0.5
 BN_DECAY_DECAY_RATE = 0.5
