@@ -121,7 +121,7 @@ def run(in_data_dir, label_data_file_path, partial_data_dir, out_data_dir, file_
             sample = os.path.basename(filename)
             if sample in all_data_labels:
 
-                partial_full_path = os.path.join(partial_data_dir, sample)
+                partial_full_path = os.path.join(partial_data_dir, sample.replace('.npz', '.h5'))
                 if os.path.exists(partial_full_path):
                     points, ligand_id = load_h5(partial_full_path)
                     points = points[0]
