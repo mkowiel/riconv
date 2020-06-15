@@ -17,6 +17,7 @@ warnings.simplefilter(action='ignore', category=ConvergenceWarning)
 
 
 SEED = 31773
+np.random.seed(SEED)
 
 
 def save_h5(h5_filename, data, label, data_dtype='float16', label_dtype='uint8'):
