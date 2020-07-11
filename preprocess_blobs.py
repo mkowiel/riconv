@@ -17,7 +17,6 @@ warnings.simplefilter(action='ignore', category=ConvergenceWarning)
 
 
 SEED = 31773
-np.random.seed(SEED)
 
 
 def save_h5(h5_filename, data, label, data_dtype='float16', label_dtype='uint8'):
@@ -102,6 +101,8 @@ def extract_points_kmeans(filename, n_clusters, grid_size=2.0/283.0, verbose=0):
 
 
 def run(in_data_dir, label_data_file_path, partial_data_dir, out_data_dir, file_name_prefix, n_points, n_bactch_size, verbose=0):
+    np.random.seed(SEED)
+
     if not os.path.exists(out_data_dir):
         os.makedirs(out_data_dir)
 
@@ -161,6 +162,31 @@ def run(in_data_dir, label_data_file_path, partial_data_dir, out_data_dir, file_
     print('END')
 
 
+def fill_cache(in_data_dir, label_data_file_path, partial_data_dir, n_points, verbose=0):
+    print('FILL CACHE MODE')
+    if not os.path.exists(partial_data_dir):
+        os.makedirs(partial_data_dir)
+
+    labels, all_data_labels = prepare_data_labels(label_data_file_path)
+
+    npz_filenames = list(glob.glob(os.path.join(in_data_dir, "*.npz")))
+    np.random.shuffle(npz_filenames)
+    for filename in tqdm(npz_filenames):
+        sample = os.path.basename(filename)
+        if sample in all_data_labels:
+
+            partial_full_path = os.path.join(partial_data_dir, sample.replace('.npz', '.h5'))
+            if not os.path.exists(partial_full_path):
+                ligand = all_data_labels[sample]
+                ligand_id = labels[ligand]
+                if verbose > 0:
+                    print(filename, ligand, ligand_id)
+                points = extract_points_kmeans(filename, n_points, verbose=verbose)
+                save_h5(partial_full_path, [points], [ligand_id])
+
+    print('END')
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--in_data_dir', default='blobs_full', help='Data dir [default: blobs_sample]')
 parser.add_argument('--label_data_file_path', default='cmb_blob_labels.csv', help='data labels [default: cmb_blob_labels.csv]')
@@ -169,7 +195,11 @@ parser.add_argument('--out_data_dir', default='blobs_full_1024', help='Data dir 
 parser.add_argument('--file_name_prefix', default='blobs_full', help='Data dir [default: blobs_full]')
 parser.add_argument('--n_points', type=int, default=1024, help='number of points per sample [default: 1024]')
 parser.add_argument('--n_bactch_size', type=int, default=2048, help='Number of samples in h5 file [default: 2048]')
+parser.add_argument('--cache_only', type=bool, default=False, help='Save files only to cache dir [default: False]')
 FLAGS = parser.parse_args()
 
 if __name__ == "__main__":
-    run(FLAGS.in_data_dir, FLAGS.label_data_file_path, FLAGS.partial_data_dir, FLAGS.out_data_dir, FLAGS.file_name_prefix, FLAGS.n_points, FLAGS.n_bactch_size)
+    if FLAGS.cache_only:
+        fill_cache(FLAGS.in_data_dir, FLAGS.label_data_file_path, FLAGS.partial_data_dir, FLAGS.n_points)
+    else:
+        run(FLAGS.in_data_dir, FLAGS.label_data_file_path, FLAGS.partial_data_dir, FLAGS.out_data_dir, FLAGS.file_name_prefix, FLAGS.n_points, FLAGS.n_bactch_size)
